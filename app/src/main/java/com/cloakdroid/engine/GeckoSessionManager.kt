@@ -58,6 +58,9 @@ class GeckoSessionManager @Inject constructor(
      */
     private val _blocked = MutableStateFlow(false)
 
+    private val _diagnostics = MutableStateFlow<List<NetworkDiagnostic>>(emptyList())
+    val diagnostics: StateFlow<List<NetworkDiagnostic>> = _diagnostics.asStateFlow()
+
     /** `true` when navigation is currently refused (proxy failed, kill switch armed). */
     val blocked: StateFlow<Boolean> = _blocked.asStateFlow()
 
@@ -203,6 +206,57 @@ class GeckoSessionManager @Inject constructor(
      * Clears the kill-switch latch so navigation is allowed again. The user
      * explicitly accepts that the connection may now be direct.
      */
+    /**
+     * Returns honest capability diagnostics for the active engine. Network
+     * egress requires a controlled endpoint/device comparison; this method
+     * deliberately reports that limitation instead of inventing a pass.
+     */
+    fun refreshDiagnostics() {
+        val proxy = currentProfileId?.let { repository.proxyConfigFor(it) }
+        val entries = mutableListOf(
+            NetworkDiagnostic(
+                "GeckoView session",
+                if (_currentSession.value != null) DiagnosticStatus.PASS else DiagnosticStatus.FAILED,
+                if (_currentSession.value != null) "A live GeckoSession is attached" else "No live GeckoSession"
+            ),
+            NetworkDiagnostic(
+                "Browser egress",
+                DiagnosticStatus.NOT_TESTED,
+                "Requires a controlled browser endpoint; OkHttp proxy success is not browser egress proof"
+            ),
+            NetworkDiagnostic(
+                "DNS and IPv6 leak status",
+                DiagnosticStatus.NOT_TESTED,
+                "No device-level DNS/IPv6 fixture is available"
+            ),
+            NetworkDiagnostic(
+                "WebRTC native routing",
+                DiagnosticStatus.WARNING,
+                "Page-level policy is not proof of native WebRTC routing"
+            ),
+            NetworkDiagnostic(
+                "Profile storage isolation",
+                DiagnosticStatus.UNSUPPORTED,
+                "Gecko SessionContext isolation is not installed yet"
+            ),
+            NetworkDiagnostic(
+                "Concurrent profiles",
+                DiagnosticStatus.UNSUPPORTED,
+                "The current manager owns one live session and one runtime proxy"
+            )
+        )
+        if (proxy?.type == com.cloakdroid.data.network.ProxyType.SOCKS5 &&
+            !proxy.username.isNullOrBlank()
+        ) {
+            entries += NetworkDiagnostic(
+                "Authenticated SOCKS5 browser routing",
+                DiagnosticStatus.UNSUPPORTED,
+                "Authenticated SOCKS5 browser routing is not implemented"
+            )
+        }
+        _diagnostics.value = entries.map { it.copy(testedAt = System.currentTimeMillis()) }
+    }
+
     fun unblock() {
         synchronized(lock) { _blocked.value = false }
     }
