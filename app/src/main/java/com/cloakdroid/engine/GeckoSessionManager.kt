@@ -92,6 +92,18 @@ class GeckoSessionManager @Inject constructor(
             _blocked.value = true
             throw IllegalStateException("Proxy configuration is incomplete or has an invalid port")
         }
+        if (proxy?.type == com.cloakdroid.data.network.ProxyType.HTTPS) {
+            _blocked.value = true
+            throw IllegalStateException(
+                "TLS-encrypted proxy endpoints are unsupported; use an HTTP CONNECT proxy"
+            )
+        }
+        if (proxy?.type == com.cloakdroid.data.network.ProxyType.SOCKS5 &&
+            !proxy.username.isNullOrBlank()
+        ) {
+            _blocked.value = true
+            throw IllegalStateException("Authenticated SOCKS5 browser routing is unsupported")
+        }
         // Reflection/API failure must be visible and must never degrade into
         // direct browsing.
         val runtime = engine.runtime

@@ -87,6 +87,17 @@ class ProxyTester @Inject constructor(
             return@withContext ProxyTestResult.NetworkError("Invalid proxy host/port: $host:$port")
         }
 
+        if (proxy.type == ProxyType.SOCKS5 && !proxy.username.isNullOrBlank()) {
+            return@withContext ProxyTestResult.Unsupported(
+                "Authenticated SOCKS5 is not implemented by this client"
+            )
+        }
+        if (proxy.type == ProxyType.HTTPS) {
+            return@withContext ProxyTestResult.Unsupported(
+                "TLS-encrypted proxy endpoints are not implemented; HTTP CONNECT is supported"
+            )
+        }
+
         val builder = OkHttpClient.Builder()
             .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)

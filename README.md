@@ -10,7 +10,9 @@ operation without device testing.
 - Kotlin, Jetpack Compose, GeckoView 128, Hilt, Room and OkHttp.
 - Profile records, per-profile application data directories, bookmarks and
   history are implemented.
-- HTTP/HTTPS and SOCKS5 proxy **testing** is implemented through OkHttp.
+- HTTP CONNECT and unauthenticated SOCKS5 proxy **testing** is implemented
+  through OkHttp. Authenticated SOCKS5 and TLS-encrypted proxy endpoints are
+  reported as Unsupported rather than silently downgraded.
 - Proxy input accepts separate fields and common pasted proxy URL formats.
 - Invalid non-direct proxy configuration fails closed instead of silently
   becoming Direct.
