@@ -2,9 +2,15 @@ name: Build APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
+      - 'arena/**'
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
+      - 'arena/**'
   workflow_dispatch:
 
 permissions:
