@@ -124,8 +124,24 @@ class ProfileRepository @Inject constructor(
 
     private suspend fun proxyConfigForSuspend(profileId: String): ProxyConfig? {
         val profile = dao.getById(profileId) ?: return null
-        if (profile.proxyHost.isNullOrBlank()) return null
         val rawType = profile.proxyType.uppercase()
+        if (rawType == "DIRECT" && profile.proxyHost.isNullOrBlank()) return null
+        if (profile.proxyHost.isNullOrBlank()) {
+            // Preserve the intended non-direct mode so the engine can reject
+            // the invalid configuration instead of silently using Direct.
+            return ProxyConfig(
+                host = profile.proxyHost,
+                port = profile.proxyPort,
+                username = profile.proxyUsername,
+                password = profile.proxyPassword,
+                type = when {
+                    rawType.contains("SOCKS") -> ProxyType.SOCKS5
+                    rawType == "HTTPS" -> ProxyType.HTTPS
+                    rawType == "HTTP" -> ProxyType.HTTP
+                    else -> return null
+                }
+            )
+        }
         val proxyType = when {
             rawType.contains("SOCKS") -> ProxyType.SOCKS5
             rawType.contains("HTTPS") -> ProxyType.HTTPS

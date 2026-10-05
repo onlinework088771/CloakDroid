@@ -87,8 +87,14 @@ class GeckoSessionManager @Inject constructor(
             engine.resetRuntime(proxy)
         }
 
-        // Proxy routing is a safety precondition. Reflection/API failure must
-        // be visible and must never degrade into direct browsing.
+        // Proxy routing is a safety precondition. Invalid non-direct
+        // configuration must never degrade into Direct browsing.
+        if (proxy != null && (proxy.host.isNullOrBlank() || proxy.port !in 1..65535)) {
+            _blocked.value = true
+            throw IllegalStateException("Proxy configuration is incomplete or has an invalid port")
+        }
+        // Reflection/API failure must be visible and must never degrade into
+        // direct browsing.
         val runtime = engine.runtime
         if (proxy != null && engine.proxyConfigurationError != null) {
             _blocked.value = true
