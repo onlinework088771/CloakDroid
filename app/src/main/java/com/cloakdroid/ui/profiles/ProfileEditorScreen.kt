@@ -557,6 +557,13 @@ fun ProfileEditorScreen(
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                                             )
+                                            result.metadataWarning?.let { warning ->
+                                                Text(
+                                                    text = "Warning: $warning",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                            }
                                             Spacer(modifier = Modifier.height(8.dp))
                                             com.cloakdroid.ui.theme.CloakButtons.GhostButton(
                                                 text = "Apply matching timezone, locale & location",

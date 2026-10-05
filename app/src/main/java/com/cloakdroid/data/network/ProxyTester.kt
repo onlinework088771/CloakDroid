@@ -46,7 +46,8 @@ sealed interface ProxyTestResult {
         val lat: Double,
         val lon: Double,
         val suggestedTimezoneId: String,
-        val suggestedLocale: String
+        val suggestedLocale: String,
+        val metadataWarning: String? = null
     ) : ProxyTestResult
 
     object Timeout : ProxyTestResult
@@ -210,7 +211,7 @@ class ProxyTester @Inject constructor(
 
         val latencyMs = (System.nanoTime() - startNanos) / 1_000_000L
 
-        val geo: GeoLookupResponse
+        val geo: GeoLookupResponse?
         try {
             val geoRequest = Request.Builder()
                 .url("$IP_API_URL/$ip")
@@ -230,25 +231,33 @@ class ProxyTester @Inject constructor(
                 val body = response.body?.string().orEmpty()
                 val parsed = runCatching {
                     json.decodeFromString(GeoLookupResponse.serializer(), body)
-                }.getOrElse { return ProxyTestResult.NetworkError("Malformed geo body") }
-
-                if (!parsed.success) {
-                    return ProxyTestResult.NetworkError(parsed.message ?: "Geo lookup failed")
-                }
-                geo = parsed
+                }.getOrNull()
+                geo = parsed?.takeIf { it.success }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
-        } catch (e: SocketTimeoutException) {
-            return ProxyTestResult.Timeout
+        } catch (_: SocketTimeoutException) {
+            geo = null
         } catch (e: IOException) {
-            return if (isAuthMessage(e.message)) {
-                ProxyTestResult.AuthFailure(e.message ?: "Authentication failed")
-            } else {
-                ProxyTestResult.NetworkError(e.message ?: "Geo lookup I/O failure")
-            }
-        } catch (e: Exception) {
-            return ProxyTestResult.NetworkError(e.message ?: "Unexpected geo failure")
+            if (isAuthMessage(e.message)) return ProxyTestResult.AuthFailure(e.message ?: "Authentication failed")
+            geo = null
+        } catch (_: Exception) {
+            geo = null
+        }
+
+        if (geo == null) {
+            return ProxyTestResult.Success(
+                latencyMs = latencyMs,
+                publicIp = ip,
+                countryCode = "ZZ",
+                city = "Unknown",
+                isp = "Unknown",
+                lat = 0.0,
+                lon = 0.0,
+                suggestedTimezoneId = DEFAULT_TIMEZONE,
+                suggestedLocale = DEFAULT_LOCALE,
+                metadataWarning = "Public IP verified; location metadata is unavailable"
+            )
         }
 
         val countryCode = geo.countryCode?.trim()?.uppercase().orEmpty().ifEmpty { "ZZ" }
