@@ -87,11 +87,19 @@ class GeckoSessionManager @Inject constructor(
             engine.resetRuntime(proxy)
         }
 
+        // Proxy routing is a safety precondition. Reflection/API failure must
+        // be visible and must never degrade into direct browsing.
+        val runtime = engine.runtime
+        if (proxy != null && engine.proxyConfigurationError != null) {
+            _blocked.value = true
+            throw IllegalStateException(engine.proxyConfigurationError)
+        }
+
         val session = engine.newSession()
         engine.applyProfileSettings(session, profileUserAgents[profileId])
 
         try {
-            session.open(engine.runtime)
+            session.open(runtime)
             session.loadUri(url)
         } catch (t: Throwable) {
             Log.w(TAG, "launch failed for profile=$profileId url=$url", t)

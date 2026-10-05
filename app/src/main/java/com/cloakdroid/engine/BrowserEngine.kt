@@ -59,6 +59,11 @@ class BrowserEngine @Inject constructor(
     var activeProxy: ProxyConfig? = null
         private set
 
+    /** Non-null when Gecko rejected/failed to receive the selected proxy prefs. */
+    @Volatile
+    var proxyConfigurationError: String? = null
+        private set
+
     fun runtimeMatchesProxy(proxy: ProxyConfig?): Boolean =
         runtimeRef != null && activeProxy == proxy
 
@@ -90,6 +95,7 @@ class BrowserEngine @Inject constructor(
             }
             runtimeRef = null
             activeProxy = proxy
+            proxyConfigurationError = null
             Log.i(TAG, "GeckoRuntime reset for proxy=${proxy?.type}")
         }
     }
@@ -172,9 +178,11 @@ class BrowserEngine @Inject constructor(
             )
             method.isAccessible = true
             method.invoke(runtime, bundle)
+            proxyConfigurationError = null
             Log.i(TAG, "Applied ${'$'}{prefs.size} proxy prefs to runtime")
         } catch (t: Throwable) {
-            Log.w(TAG, "Failed to apply proxy prefs", t)
+            proxyConfigurationError = "Gecko proxy preferences could not be applied"
+            Log.e(TAG, "Failed to apply proxy prefs; refusing to claim proxy routing", t)
         }
     }
 

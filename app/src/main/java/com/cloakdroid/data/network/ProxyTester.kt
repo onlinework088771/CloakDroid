@@ -51,6 +51,7 @@ sealed interface ProxyTestResult {
 
     object Timeout : ProxyTestResult
     data class AuthFailure(val msg: String) : ProxyTestResult
+    data class Unsupported(val msg: String) : ProxyTestResult
     data class NetworkError(val msg: String) : ProxyTestResult
 }
 
@@ -123,7 +124,11 @@ class ProxyTester @Inject constructor(
                 val password = proxy.password
                 if (!username.isNullOrEmpty()) {
                     builder.proxyAuthenticator { route: Route?, response: Response ->
-                        if (response.code == HTTP_PROXY_AUTH_REQUIRED ||
+                        // Never retry credentials indefinitely; OkHttp may invoke
+                        // the authenticator once per challenge/route.
+                        if (responseCount(response, HTTP_PROXY_AUTH_REQUIRED) >= MAX_AUTH_ATTEMPTS) {
+                            null
+                        } else if (response.code == HTTP_PROXY_AUTH_REQUIRED ||
                             response.header("Proxy-Authenticate") != null
                         ) {
                             val credential = Credentials.basic(username, password.orEmpty())
@@ -173,6 +178,8 @@ class ProxyTester @Inject constructor(
                     return ProxyTestResult.NetworkError("Empty public IP returned")
                 }
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: SocketTimeoutException) {
             return ProxyTestResult.Timeout
         } catch (e: java.net.ConnectException) {
@@ -230,6 +237,8 @@ class ProxyTester @Inject constructor(
                 }
                 geo = parsed
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: SocketTimeoutException) {
             return ProxyTestResult.Timeout
         } catch (e: IOException) {
@@ -282,6 +291,16 @@ class ProxyTester @Inject constructor(
             val parts = r.split("-")
             if (parts.size == 2 && parts[1].length == 2) "en-${parts[1]}" else DEFAULT_LOCALE
         }
+    }
+
+    private fun responseCount(response: Response, code: Int): Int {
+        var count = 1
+        var prior = response.priorResponse
+        while (prior != null) {
+            if (prior.code == code) count++
+            prior = prior.priorResponse
+        }
+        return count
     }
 
     private fun isAuthMessage(message: String?): Boolean {
@@ -340,6 +359,7 @@ class ProxyTester @Inject constructor(
     companion object {
         private const val TIMEOUT_SECONDS = 15L
         private const val HTTP_PROXY_AUTH_REQUIRED = 407
+        private const val MAX_AUTH_ATTEMPTS = 3
         private const val USER_AGENT = "CloakDroid/1.0"
         private const val IPIFY_URL = "https://api.ipify.org?format=json"
         // ip-api.com free tier is HTTP-only and the app forbids cleartext

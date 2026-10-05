@@ -151,11 +151,11 @@ class ProfileRepository @Inject constructor(
     suspend fun testProxyFor(profile: ProfileEntity): ProxyTestResult {
         val rawType = profile.proxyType.uppercase()
         val proxyType = when {
-            profile.proxyHost.isNullOrBlank() -> ProxyType.DIRECT
+            profile.proxyHost.isNullOrBlank() && rawType == "DIRECT" -> ProxyType.DIRECT
             rawType.contains("SOCKS") -> ProxyType.SOCKS5
-            rawType.contains("HTTPS") -> ProxyType.HTTPS
-            rawType.contains("HTTP") -> ProxyType.HTTP
-            else -> ProxyType.DIRECT
+            rawType == "HTTPS" -> ProxyType.HTTPS
+            rawType == "HTTP" -> ProxyType.HTTP
+            else -> return ProxyTestResult.Unsupported("Unknown proxy type: ${profile.proxyType}")
         }
 
         val config = ProxyConfig(

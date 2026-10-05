@@ -75,6 +75,33 @@ private const val PROXY_DIRECT = "DIRECT"
 
 private val ProxyTypeOptions = listOf(PROXY_SOCKS5, PROXY_HTTP, PROXY_HTTPS, PROXY_DIRECT)
 
+/** Accept both separate fields and the common proxy URL formats users paste. */
+private data class PastedProxy(
+    val type: String?,
+    val host: String,
+    val port: String,
+    val username: String?,
+    val password: String?
+)
+
+private fun parsePastedProxy(value: String): PastedProxy? {
+    val raw = value.trim()
+    if (raw.isEmpty()) return null
+    val withScheme = if (raw.contains("://")) raw else "http://$raw"
+    val uri = runCatching { java.net.URI(withScheme) }.getOrNull() ?: return null
+    val host = uri.host ?: return null
+    val port = uri.port.takeIf { it > 0 }?.toString() ?: return null
+    val scheme = uri.scheme?.lowercase()
+    val type = when (scheme) {
+        "socks5", "socks" -> PROXY_SOCKS5
+        "https" -> PROXY_HTTPS
+        "http" -> PROXY_HTTP
+        else -> null
+    }
+    val userInfo = uri.userInfo?.split(":", limit = 2)
+    return PastedProxy(type, host, port, userInfo?.getOrNull(0), userInfo?.getOrNull(1))
+}
+
 /** 3-state WebRTC policy shown as radio buttons in the Spoofing tab. */
 private enum class WebRtcPolicyOption(
     val label: String,
@@ -405,8 +432,19 @@ fun ProfileEditorScreen(
 
                             OutlinedTextField(
                                 value = proxyHost,
-                                onValueChange = { proxyHost = it },
-                                label = { Text("Host") },
+                                onValueChange = { value ->
+                                    val pasted = parsePastedProxy(value)
+                                    if (pasted != null) {
+                                        proxyHost = pasted.host
+                                        proxyPort = pasted.port
+                                        pasted.type?.let { proxyType = it }
+                                        pasted.username?.let { proxyUsername = it }
+                                        pasted.password?.let { proxyPassword = it }
+                                    } else {
+                                        proxyHost = value
+                                    }
+                                },
+                                label = { Text("Host or proxy URL") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                                 modifier = Modifier.fillMaxWidth()
@@ -450,7 +488,7 @@ fun ProfileEditorScreen(
                                         proxyPassword
                                     )
                                 },
-                                enabled = proxyHost.isNotBlank() &&
+                                enabled = !testing && proxyHost.isNotBlank() &&
                                     (proxyPort.toIntOrNull() ?: 0) in 1..65535,
                                 modifier = Modifier.fillMaxWidth(),
                                 height = 48.dp
@@ -478,6 +516,8 @@ fun ProfileEditorScreen(
                                     ResultCard(ok = false, message = "The proxy did not respond in time (timeout).")
                                 result is com.cloakdroid.data.network.ProxyTestResult.AuthFailure ->
                                     ResultCard(ok = false, message = result.msg)
+                                result is com.cloakdroid.data.network.ProxyTestResult.Unsupported ->
+                                    ResultCard(ok = false, message = "Unsupported: ${result.msg}")
                                 result is com.cloakdroid.data.network.ProxyTestResult.NetworkError ->
                                     ResultCard(ok = false, message = result.msg)
                                 result is com.cloakdroid.data.network.ProxyTestResult.Success -> {
