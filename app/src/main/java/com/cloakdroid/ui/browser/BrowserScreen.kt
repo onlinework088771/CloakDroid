@@ -87,6 +87,7 @@ fun BrowserScreen(
     var showProfileSheet by remember { mutableStateOf(false) }
     var showBookmarkSheet by remember { mutableStateOf(false) }
     var showHistorySheet by remember { mutableStateOf(false) }
+    var launchError by remember { mutableStateOf<String?>(null) }
 
     val bookmarks by viewModel.observeBookmarks(profileId)
         .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -119,8 +120,16 @@ fun BrowserScreen(
     }
 
     DisposableEffect(profileId) {
-        val created = sessionManager.launch(profileId, DEFAULT_START_URL)
-        session = created
+        try {
+            val created = sessionManager.launch(profileId, DEFAULT_START_URL)
+            session = created
+            launchError = null
+        } catch (t: Throwable) {
+            // A proxy configuration error is a routing failure, not a blank
+            // page. Keep it visible instead of crashing the Compose screen.
+            session = null
+            launchError = t.message ?: "Browser could not start with this proxy"
+        }
         onDispose {
             sessionManager.destroyCurrent()
             session = null
@@ -128,6 +137,20 @@ fun BrowserScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        launchError?.let { message ->
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("Browser routing unavailable", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(4.dp))
+                    Text(message, style = MaterialTheme.typography.bodySmall)
+                    Text("Browsing was blocked; no Direct fallback was used.", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
         // ---- Top bar -------------------------------------------------------
         Row(
             modifier = Modifier
@@ -281,8 +304,13 @@ fun BrowserScreen(
                     )
                     Spacer(Modifier.width(10.dp))
                     TextButton(onClick = {
-                        sessionManager.unblock()
-                        sessionManager.launch(profileId, DEFAULT_START_URL)
+                        try {
+                            sessionManager.unblock()
+                            session = sessionManager.launch(profileId, DEFAULT_START_URL)
+                            launchError = null
+                        } catch (t: Throwable) {
+                            launchError = t.message ?: "Browser relaunch failed"
+                        }
                     }) {
                         Text("Relaunch", color = CloakColors.Primary)
                     }
