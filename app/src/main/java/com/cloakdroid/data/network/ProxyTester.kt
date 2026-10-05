@@ -271,10 +271,11 @@ class ProxyTester @Inject constructor(
             )
         }
 
-        val countryCode = geo.countryCode?.trim()?.uppercase().orEmpty().ifEmpty { "ZZ" }
+        val resolvedGeo = geo ?: error("geo metadata unexpectedly unavailable")
+        val countryCode = resolvedGeo.countryCode?.trim()?.uppercase().orEmpty().ifEmpty { "ZZ" }
         // Prefer the timezone reported by the geo service itself (exact city-
         // level match), then fall back to the country-level map.
-        val geoTz = geo.timezone?.id?.trim().orEmpty()
+        val geoTz = resolvedGeo.timezone?.id?.trim().orEmpty()
         val (mapTz, mapLocale) = timezoneAndLocaleFor(countryCode)
         val tz = geoTz.ifEmpty { mapTz }
         val locale = if (geoTz.isEmpty()) mapLocale else suggestedLocaleFor(tz)
@@ -283,14 +284,14 @@ class ProxyTester @Inject constructor(
             latencyMs = latencyMs,
             publicIp = ip,
             countryCode = countryCode,
-            city = geo.city?.trim().orEmpty().ifEmpty { "Unknown" },
-            isp = geo.connection?.isp?.trim().orEmpty()
-                .ifEmpty { geo.isp?.trim().orEmpty() }
-                .ifEmpty { geo.connection?.org?.trim().orEmpty() }
-                .ifEmpty { geo.org?.trim().orEmpty() }
+            city = resolvedGeo.city?.trim().orEmpty().ifEmpty { "Unknown" },
+            isp = resolvedGeo.connection?.isp?.trim().orEmpty()
+                .ifEmpty { resolvedGeo.isp?.trim().orEmpty() }
+                .ifEmpty { resolvedGeo.connection?.org?.trim().orEmpty() }
+                .ifEmpty { resolvedGeo.org?.trim().orEmpty() }
                 .ifEmpty { "Unknown" },
-            lat = geo.latitude ?: geo.lat ?: 0.0,
-            lon = geo.longitude ?: geo.lon ?: 0.0,
+            lat = resolvedGeo.latitude ?: resolvedGeo.lat ?: 0.0,
+            lon = resolvedGeo.longitude ?: resolvedGeo.lon ?: 0.0,
             suggestedTimezoneId = tz,
             suggestedLocale = locale
         )
