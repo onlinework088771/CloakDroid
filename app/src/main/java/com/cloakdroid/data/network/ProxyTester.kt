@@ -222,7 +222,7 @@ class ProxyTester @Inject constructor(
 
         val latencyMs = (System.nanoTime() - startNanos) / 1_000_000L
 
-        val geo: GeoLookupResponse?
+        var geo: GeoLookupResponse? = null
         try {
             val geoRequest = Request.Builder()
                 .url("$IP_API_URL/$ip")
