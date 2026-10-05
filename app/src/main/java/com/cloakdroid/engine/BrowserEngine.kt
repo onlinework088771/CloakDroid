@@ -51,9 +51,8 @@ class BrowserEngine @Inject constructor(
      */
     /**
      * The proxy currently configured on the runtime, or null for direct.
-     * Changing it after the runtime exists requires a runtime restart; the
-     * caller (GeckoSessionManager) recreates the runtime when the profile's
-     * proxy differs from the active one.
+     * Changing it after the runtime exists is refused. GeckoRuntime is
+     * process-lifetime state; a different proxy requires a fresh process.
      */
     @Volatile
     var activeProxy: ProxyConfig? = null
@@ -88,15 +87,19 @@ class BrowserEngine @Inject constructor(
     fun resetRuntime(proxy: ProxyConfig?) {
         synchronized(runtimeLock) {
             if (activeProxy == proxy && runtimeRef != null) return
-            runtimeRef?.let { old ->
-                try { old.shutdown() } catch (t: Throwable) {
-                    Log.w(TAG, "runtime shutdown failed", t)
-                }
+            if (runtimeRef != null && activeProxy != proxy) {
+                // GeckoRuntime is process-lifetime state. Shutting it down while
+                // switching a focused tab/profile is not a safe way to obtain
+                // per-profile routing and can invalidate attached GeckoViews.
+                // Refuse the switch; the caller must keep the current runtime
+                // or restart the application under an explicit future policy.
+                throw IllegalStateException(
+                    "A different proxy requires a fresh process; runtime reset is refused"
+                )
             }
-            runtimeRef = null
             activeProxy = proxy
             proxyConfigurationError = null
-            Log.i(TAG, "GeckoRuntime reset for proxy=${proxy?.type}")
+            Log.i(TAG, "GeckoRuntime configured for proxy=${proxy?.type}")
         }
     }
 

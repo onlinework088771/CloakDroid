@@ -78,10 +78,9 @@ class GeckoSessionManager @Inject constructor(
         closeCurrentLocked()
         _blocked.value = false
 
-        // Ensure the process-wide runtime matches this profile's proxy. The
-        // runtime is recreated when the proxy changed since the last launch
-        // (only safe while no session is open, which closeCurrentLocked
-        // guarantees).
+        // Ensure the process-wide runtime matches this profile's proxy. A
+        // different proxy after runtime creation is refused; silently
+        // restarting GeckoRuntime is not a safe per-profile routing strategy.
         val proxy = repository.proxyConfigFor(profileId)
         if (!engine.runtimeMatchesProxy(proxy)) {
             engine.resetRuntime(proxy)

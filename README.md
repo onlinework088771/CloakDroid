@@ -18,8 +18,10 @@ operation without device testing.
 - The browser currently owns one live GeckoSession at a time. Launching another
   profile closes the previous session; simultaneous independent profiles are
   not implemented.
-- Gecko proxy preference application is best-effort and fail-closed, but
-  browser egress has not been verified on a real device in this repository.
+- Gecko proxy preference application is best-effort and fail-closed. Once a
+  GeckoRuntime is created, switching to a different proxy is refused rather
+  than shutting down the process-lifetime runtime; browser egress has not been
+  verified on a real device in this repository.
 - SOCKS5 authentication, browser-level proxy egress, DNS/IPv6 leak behavior,
   WebSocket/download/service-worker routing, and Gecko storage isolation are
   not certified by the app.
