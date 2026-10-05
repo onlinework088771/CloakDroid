@@ -66,7 +66,23 @@ claiming a proxy works for browser traffic, compare GeckoView egress with the
 OkHttp tester using a controlled endpoint and test redirects, subresources,
 WebSockets, downloads, DNS, IPv4/IPv6, and failure behavior.
 
+## Controlled egress fixture
+
+A minimal fixture for authorized local testing is provided at
+`tools/egress_fixture.py`. It reports only the peer address observed by the
+fixture and deliberately does not log headers or credentials:
+
+```bash
+python3 tools/egress_fixture.py --host 0.0.0.0 --port 8080
+```
+
+The Android device must be able to reach the host using its LAN address. Do not
+expose this fixture to the public internet. Compare its observed address for
+an OkHttp request and a GeckoView request; the current app does not yet
+automatically capture and compare both responses, so the diagnostics screen
+must remain `NOT_TESTED` until that device test is performed.
+
 ## CI
 
-`.github/workflows/build-apk.yml` currently assembles the debug APK. Device
-and instrumentation tests are not yet part of the workflow.
+`.github/workflows/build-apk.yml` runs unit tests, lint, and assembles the
+ debug APK. Device and instrumentation tests are not yet part of the workflow.
